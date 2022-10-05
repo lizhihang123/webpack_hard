@@ -5,14 +5,36 @@ const parser = require("@babel/parser");
 const traverse = require("@babel/traverse").default;
 const generate = require("@babel/generator").default;
 const ejs = require("ejs");
+const { SyncHook } = require("tapable");
 class Compiler {
   constructor(config) {
     this.config = config;
     this.root = process.cwd(); // 获取代码运行的时候的配置
     this.entry = config.entry; // 入口配置
     this.modules = {}; // 键值对 路径对应的源码
+    // Compiler.hooks.emit 所以必须这里写一个hooks里面是生命周期钩子
+    // 先有hooks才去遍历“这个数组”，然后apply执行里面的函数
+    this.hooks = {
+      beforeRun: new SyncHook(),
+      run: new SyncHook(),
+      make: new SyncHook(),
+      emit: new SyncHook(["modules"]),
+      afterCompile: new SyncHook(),
+      afterEmit: new SyncHook(),
+      done: new SyncHook(),
+    };
+    if (Array.isArray(this.config.plugins)) {
+      // 传入this 就是Compiler类
+      // item是每个插件 每个插件里面的apply方法执行
+      // 一旦执行就会绑定hook对应的事件
+      // 所以上面先定义hooks
+      this.config.plugins.forEach((item) => item.apply(this));
+    }
   }
   start() {
+    this.hooks.beforeRun.call();
+    this.hooks.run.call();
+    this.hooks.make.call();
     // process.cwd()能够获取执行zh-pack命令的目录
     // 当前nodejs进程执行时的目录
     // this.depAnalysis(path.resolve(this.root, this.entry));
@@ -20,7 +42,11 @@ class Compiler {
     // __dirname拼接的是compiler.js文件所在的目录 所以是 /lib 当前模块的目录名
     // this.depAnalysis(path.resolve(__dirname, this.entry));
     // D:\heima\front\8. webpack学习\demo5\zh-pack\lib\src\index.js
+    this.hooks.afterCompile.call();
     this.emitFile();
+    this.hooks.emit.call(this.modules);
+    this.hooks.afterEmit.call();
+    this.hooks.done.call();
   }
   // 解析模块路径的依赖
   depAnalysis(modulePath) {
@@ -117,6 +143,7 @@ class Compiler {
     // console.log(this.module);
   }
 
+  //bundle.js文件放到ouput指定的目录中去
   emitFile() {
     // 1、获取模板引擎的内容
     let template = this.getSource(

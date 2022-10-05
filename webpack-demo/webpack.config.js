@@ -1,4 +1,6 @@
 const path = require("path");
+const HelloWorldPlugin = require("./plugin/HelloWorldPlugin");
+const HTMLPlugin = require("./plugin/HTMLPlugin");
 module.exports = {
   mode: "development",
   entry: "./src/index.js",
@@ -6,6 +8,13 @@ module.exports = {
     filename: "bundle.js",
     path: path.resolve("./dist"),
   },
+  plugins: [
+    new HelloWorldPlugin(),
+    // new HTMLPlugin({
+    //   filename: "index.html",
+    //   template: "./src/index.js",
+    // }),
+  ],
   module: {
     rules: [
       {
